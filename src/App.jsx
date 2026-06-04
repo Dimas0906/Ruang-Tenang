@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 
+// Proxy untuk GSAP yang dimuat via CDN
+const gsap = {
+  to: (...args) => window.gsap?.to(...args),
+  from: (...args) => window.gsap?.from(...args),
+  fromTo: (...args) => window.gsap?.fromTo(...args),
+};
+
 /* ─────────────────── QUOTE DATA ─────────────────── */
 
 const RENUNGAN = [
@@ -231,13 +238,15 @@ function BreathingGuide({ onDone }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
       {phase === "idle" && (
-        <div style={{ width: "100%", borderRadius: 16, padding: 16, background: "#f0faf6", boxSizing: "border-box" }}>
-          <p style={{ fontSize: 14, fontWeight: 600, textAlign: "center", margin: "0 0 12px 0", color: "#2d5a45" }}>Pilih berapa siklus napas:</p>
+        <div style={{ width: "100%", borderRadius: 16, padding: "16px", background: "#f0faf6", boxSizing: "border-box" }}>
+          <p style={{ fontSize: 14, fontWeight: 600, textAlign: "center", marginBottom: 12, color: "#2d5a45" }}>Pilih berapa siklus napas:</p>
           <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
             {[3, 5, 7].map((n) => (
               <button
                 key={n}
                 onClick={() => setTotalCycles(n)}
+                onMouseEnter={(e) => { if(totalCycles !== n) gsap.to(e.currentTarget, { scale: 1.05, duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
+                onMouseLeave={(e) => { if(totalCycles !== n) gsap.to(e.currentTarget, { scale: 1, duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
                 style={{
                   background: totalCycles === n ? "#4a9d7f" : "#ffffff",
                   color: totalCycles === n ? "#ffffff" : "#4a9d7f",
@@ -247,7 +256,6 @@ function BreathingGuide({ onDone }) {
                   fontWeight: 700,
                   fontSize: "16px",
                   cursor: "pointer",
-                  transition: "all 0.2s",
                 }}
               >
                 {n}×
@@ -287,6 +295,8 @@ function BreathingGuide({ onDone }) {
       {phase === "idle" && (
         <button
           onClick={start}
+          onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.03, y: -2, backgroundColor: "#3d8a6e", duration: 0.2, ease: "power2.out", overwrite: "auto" })}
+          onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, y: 0, backgroundColor: "#4a9d7f", duration: 0.2, ease: "power2.out", overwrite: "auto" })}
           style={{
             background: "#4a9d7f",
             color: "#ffffff",
@@ -297,10 +307,7 @@ function BreathingGuide({ onDone }) {
             fontSize: "15px",
             cursor: "pointer",
             boxShadow: "0 4px 16px rgba(74,157,127,0.40)",
-            transition: "all 0.2s",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#3d8a6e")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "#4a9d7f")}
         >
           🌬️ Mulai Latihan Napas
         </button>
@@ -360,6 +367,8 @@ function BreathingGuide({ onDone }) {
           </p>
           <button
             onClick={onDone}
+            onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.05, y: -2, duration: 0.2, ease: "power2.out", overwrite: "auto" })}
+            onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, y: 0, duration: 0.2, ease: "power2.out", overwrite: "auto" })}
             style={{
               background: "#4a9d7f", color: "#ffffff", border: "none",
               borderRadius: "999px", padding: "12px 32px", fontWeight: 700,
@@ -384,18 +393,37 @@ function BreathingGuide({ onDone }) {
 /* ─────────────────── PILL OPTION BUTTON ─────────────────── */
 
 function OptionPill({ selected, onClick, children, selectedColor = "#4a9d7f" }) {
+  const pillRef = useRef(null);
+
+  useEffect(() => {
+    gsap.to(pillRef.current, {
+      backgroundColor: selected ? selectedColor : "#ffffff",
+      color: selected ? "#ffffff" : "#3d5a4a",
+      borderColor: selected ? selectedColor : "#b8d4c8",
+      boxShadow: selected ? `0 2px 10px ${selectedColor}40` : "none",
+      scale: selected ? 1.04 : 1,
+      duration: 0.3,
+      ease: "power2.out",
+      overwrite: "auto"
+    });
+  }, [selected, selectedColor]);
+
+  const handleEnter = () => { if (!selected) gsap.to(pillRef.current, { scale: 1.03, y: -2, boxShadow: "0 4px 8px rgba(0,0,0,0.05)", duration: 0.2, ease: "power2.out", overwrite: "auto" }); };
+  const handleLeave = () => { if (!selected) gsap.to(pillRef.current, { scale: 1, y: 0, boxShadow: "none", duration: 0.2, ease: "power2.out", overwrite: "auto" }); };
+
   return (
     <button
+      ref={pillRef}
       onClick={onClick}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
       style={{
         display: "inline-flex", alignItems: "center", gap: 6,
         padding: "9px 14px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-        cursor: "pointer", transition: "all 0.18s",
-        background: selected ? selectedColor : "#ffffff",
-        color: selected ? "#ffffff" : "#3d5a4a",
-        border: `2px solid ${selected ? selectedColor : "#b8d4c8"}`,
-        boxShadow: selected ? `0 2px 10px ${selectedColor}40` : "none",
-        transform: selected ? "scale(1.04)" : "scale(1)",
+        cursor: "pointer",
+        border: "2px solid #b8d4c8",
+        background: "#ffffff",
+        color: "#3d5a4a"
       }}
     >
       {children}
@@ -407,8 +435,17 @@ function OptionPill({ selected, onClick, children, selectedColor = "#4a9d7f" }) 
 
 function StepCard({ number, title, subtitle, accentColor = "#4a9d7f", bgColor = "#f6fdf9", children, completed }) {
   const [open, setOpen] = useState(true);
+  const cardRef = useRef(null);
+
+  const onCardEnter = () => gsap.to(cardRef.current, { y: -2, boxShadow: "0 6px 16px rgba(0,0,0,0.06)", duration: 0.3, ease: "power2.out", overwrite: "auto" });
+  const onCardLeave = () => gsap.to(cardRef.current, { y: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", duration: 0.3, ease: "power2.out", overwrite: "auto" });
+
   return (
-    <div style={{
+    <div 
+      ref={cardRef}
+      onMouseEnter={onCardEnter}
+      onMouseLeave={onCardLeave}
+      style={{
       borderRadius: 20, overflow: "hidden",
       border: completed ? `1.5px solid ${accentColor}` : "1.5px solid #e0ece6",
       background: completed ? bgColor : "#ffffff",
@@ -453,12 +490,23 @@ function SectionLabel({ children }) {
 /* ─────────────────── HISTORY PAGE (SEMUA SESI) ─────────────────── */
 
 function HistoryPage({ onBack }) {
-  const [sessions, setSessions] = useState([]);
+  const [sessions, setSessions] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("ruang_tenang_sessions") || "[]");
+    } catch {
+      return [];
+    }
+  });
   const [expandedId, setExpandedId] = useState(null);
+  const pageRef = useRef(null);
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("ruang_tenang_sessions") || "[]");
-    setSessions(saved);
+    if (pageRef.current) {
+      gsap.fromTo(pageRef.current.children,
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.5, stagger: 0.08, ease: "power2.out" }
+      );
+    }
   }, []);
 
   const handleDelete = (id, e) => {
@@ -490,7 +538,7 @@ function HistoryPage({ onBack }) {
         </div>
       </div>
 
-      <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div ref={pageRef} style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ marginBottom: 8 }}>
           <h2 style={{ fontSize: 22, fontWeight: 900, color: "#1e3a2a", margin: "0 0 4px" }}>Riwayat Ketenanganmu</h2>
           <p style={{ color: "#6a8a78", fontSize: 14, margin: 0 }}>Melihat kembali perjalanan mindfulness-mu.</p>
@@ -638,12 +686,25 @@ function HistoryPage({ onBack }) {
 function LandingPage({ onStart, onHistory }) {
   const [quote] = useState(() => rand(QUOTES));
   const [renungan] = useState(() => rand(RENUNGAN));
+  const pageRef = useRef(null);
+
+  useEffect(() => {
+    if (pageRef.current) {
+      gsap.fromTo(pageRef.current.children,
+        { y: 40, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: "power3.out" }
+      );
+    }
+  }, []);
+
   return (
     <div style={{ minHeight: "100vh", background: "#fcf9f2", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 16px", position: "relative", overflow: "hidden" }}>
       {/* Top Right Nav Button */}
       <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10 }}>
         <button 
           onClick={onHistory}
+          onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.05, y: -2, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", duration: 0.2, ease: "power2.out", overwrite: "auto" }) }
+          onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, y: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.04)", duration: 0.2, ease: "power2.out", overwrite: "auto" }) }
           style={{ background: "#fff", border: "1.5px solid #d8ebe3", color: "#4a9d7f", padding: "8px 16px", borderRadius: 999, fontSize: 13, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
         >
           <span>🗓️</span> Semua Sesi
@@ -653,7 +714,7 @@ function LandingPage({ onStart, onHistory }) {
       <div style={{ position: "absolute", top: -80, left: -80, width: 280, height: 280, background: "#d4eadf", borderRadius: "50%", opacity: 0.3, filter: "blur(40px)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -80, right: -80, width: 320, height: 320, background: "#e8d4c4", borderRadius: "50%", opacity: 0.3, filter: "blur(40px)", pointerEvents: "none" }} />
 
-      <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 440, display: "flex", flexDirection: "column", alignItems: "center", gap: 24, marginTop: 24 }}>
+      <div ref={pageRef} style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 440, display: "flex", flexDirection: "column", alignItems: "center", gap: 24, marginTop: 24 }}>
 
         {/* Badge */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", padding: "8px 20px", borderRadius: 999, border: "1px solid #d8ebe3", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
@@ -673,8 +734,9 @@ function LandingPage({ onStart, onHistory }) {
         <div style={{ width: "100%", background: "#fff", borderRadius: 22, padding: "24px 20px", border: "1px solid #e0ece6", boxShadow: "0 2px 12px rgba(0,0,0,0.06)", position: "relative" }}>
           <div style={{ position: "absolute", top: -12, left: 18, background: "#4a9d7f", color: "#fff", fontSize: 10, fontWeight: 800, padding: "4px 14px", borderRadius: 999, letterSpacing: 0.8 }}>AFIRMASI HARI INI</div>
           <div style={{ display: "flex", gap: 10, marginTop: 8, alignItems: "flex-start" }}>
+            <span style={{ color: "#4a9d7f", fontSize: 32, fontFamily: "Georgia, serif", lineHeight: 1, flexShrink: 0 }}>"</span>
             <p style={{ color: "#1e3a2a", fontSize: 14, fontStyle: "italic", lineHeight: 1.7, margin: 0, flex: 1 }}>
-              <span style={{ color: "#4a9d7f", fontSize: 22, fontFamily: "Georgia, serif", fontStyle: "normal", verticalAlign: "bottom" }}>"</span>{quote}<span style={{ color: "#4a9d7f", fontSize: 22, fontFamily: "Georgia, serif", fontStyle: "normal", verticalAlign: "bottom" }}>"</span>
+              {quote}<span style={{ color: "#4a9d7f", fontSize: 22, fontFamily: "Georgia, serif", fontStyle: "normal", verticalAlign: "bottom" }}>"</span>
             </p>
           </div>
         </div>
@@ -682,14 +744,14 @@ function LandingPage({ onStart, onHistory }) {
         {/* CTA */}
         <button
           onClick={onStart}
+          onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.03, y: -3, backgroundColor: "#3d8a6e", duration: 0.2, ease: "power2.out", overwrite: "auto" })}
+          onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, y: 0, backgroundColor: "#4a9d7f", duration: 0.2, ease: "power2.out", overwrite: "auto" })}
           style={{
             width: "100%", background: "#4a9d7f", color: "#ffffff", border: "none",
             borderRadius: 16, padding: "16px 24px", fontWeight: 800, fontSize: 16,
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             boxShadow: "0 6px 20px rgba(74,157,127,0.40)", letterSpacing: 0.2,
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#3d8a6e")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "#4a9d7f")}
         >
           <span>💛</span> Mulai Sesi Tenang
         </button>
@@ -727,6 +789,7 @@ function LandingPage({ onStart, onHistory }) {
 /* ─────────────────── MINDFULNESS PAGE ─────────────────── */
 
 function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
+  const pageRef = useRef(null);
   const [data, setData] = useState({
     breathingDone: false,
     emotions: [],
@@ -755,6 +818,15 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
       setResponseQuote(null);
     }
   };
+
+  useEffect(() => {
+    if (pageRef.current) {
+      gsap.fromTo(pageRef.current.children,
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: "power2.out" }
+      );
+    }
+  }, []);
 
   const allStepsComplete =
     data.emotions.length > 0 && data.moment.length > 10 &&
@@ -800,7 +872,7 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
         </div>
       </div>
 
-      <div style={{ maxWidth: 600, margin: "0 auto", padding: "16px 12px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div ref={pageRef} style={{ maxWidth: 600, margin: "0 auto", padding: "16px 12px", display: "flex", flexDirection: "column", gap: 14 }}>
 
         {/* Greeting */}
         <div style={{ background: "linear-gradient(135deg, #e8f8f0 0%, #f0faf6 100%)", borderRadius: 24, padding: 24, border: "1px solid #c8e8d8", display: "flex", gap: 16, alignItems: "center" }}>
@@ -1022,13 +1094,17 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
                         const cur = data.selfCare;
                         update("selfCare", cur.includes(opt.value) ? cur.filter((v) => v !== opt.value) : [...cur, opt.value]);
                       }}
+                      onMouseEnter={(e) => { if(!sel) gsap.to(e.currentTarget, { scale: 1.05, y: -2, duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
+                      onMouseLeave={(e) => { if(!sel) gsap.to(e.currentTarget, { scale: 1, y: 0, duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
                       style={{
                         background: sel ? "#fff0f4" : "#fff",
                         border: `2px solid ${sel ? "#c0608a" : "#d8c0cc"}`,
                         borderRadius: 14, padding: "14px 8px",
                         display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                        cursor: "pointer", transition: "all 0.2s",
+                        cursor: "pointer",
                         boxShadow: sel ? "0 2px 10px rgba(192,96,138,0.25)" : "none",
+                        transform: sel ? "scale(1.03)" : "scale(1)",
+                        transition: "border 0.2s, background 0.2s, box-shadow 0.2s"
                       }}
                     >
                       <span style={{ fontSize: 24 }}>{opt.icon}</span>
@@ -1095,6 +1171,8 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
             <button
               onClick={saveSession}
               disabled={!allStepsComplete}
+              onMouseEnter={(e) => { if(allStepsComplete) gsap.to(e.currentTarget, { scale: 1.03, y: -2, backgroundColor: "#3d8a6e", duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
+              onMouseLeave={(e) => { if(allStepsComplete) gsap.to(e.currentTarget, { scale: 1, y: 0, backgroundColor: "#4a9d7f", duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
               style={{
                 width: "100%",
                 background: allStepsComplete ? "#4a9d7f" : "#e0ece6",
@@ -1110,10 +1188,7 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
                 justifyContent: "center",
                 gap: 10,
                 boxShadow: allStepsComplete ? "0 6px 20px rgba(74,157,127,0.3)" : "none",
-                transition: "all 0.2s"
               }}
-              onMouseEnter={(e) => allStepsComplete && (e.currentTarget.style.background = "#3d8a6e")}
-              onMouseLeave={(e) => allStepsComplete && (e.currentTarget.style.background = "#4a9d7f")}
             >
               <span style={{ fontSize: 18 }}>💾</span> Simpan Ringkasan Sesi
             </button>
@@ -1130,34 +1205,54 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
 
 export default function App() {
   const [page, setPage] = useState("landing"); // Pages: "landing", "mindfulness", "history"
+  const [gsapReady, setGsapReady] = useState(false);
 
-  // Inject responsive global styles once
+  // Inject responsive global styles once and load GSAP
   useEffect(() => {
     const id = "ruangtenang-global";
-    if (document.getElementById(id)) return;
-    const style = document.createElement("style");
-    style.id = id;
-    style.textContent = `
-      @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
-      *, *::before, *::after { box-sizing: border-box; }
-      html { -webkit-text-size-adjust: 100%; }
-      body { margin: 0; padding: 0; overflow-x: hidden; }
-      input, textarea, button, select {
-        font-family: 'Nunito', 'Segoe UI', sans-serif;
-        -webkit-appearance: none;
-        appearance: none;
-      }
-      textarea { resize: vertical; }
-      /* Fluid type scale */
-      @media (max-width: 480px) {
-        .rt-h1 { font-size: 28px !important; }
-        .rt-card-pad { padding: 16px !important; }
-        .rt-grid-3 { grid-template-columns: 1fr 1fr !important; }
-        .rt-pill-wrap { gap: 6px !important; }
-      }
-    `;
-    document.head.appendChild(style);
+    if (!document.getElementById(id)) {
+      const style = document.createElement("style");
+      style.id = id;
+      style.textContent = `
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+        *, *::before, *::after { box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; }
+        body { margin: 0; padding: 0; overflow-x: hidden; }
+        input, textarea, button, select {
+          font-family: 'Nunito', 'Segoe UI', sans-serif;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+        textarea { resize: vertical; }
+        /* Fluid type scale */
+        @media (max-width: 480px) {
+          .rt-h1 { font-size: 28px !important; }
+          .rt-card-pad { padding: 16px !important; }
+          .rt-grid-3 { grid-template-columns: 1fr 1fr !important; }
+          .rt-pill-wrap { gap: 6px !important; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Load GSAP via CDN
+    if (window.gsap) {
+      setGsapReady(true);
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js";
+      script.onload = () => setGsapReady(true);
+      document.head.appendChild(script);
+    }
   }, []);
+
+  if (!gsapReady) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#fcf9f2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ fontFamily: "'Nunito', sans-serif", color: "#4a9d7f", fontWeight: 700 }}>Memuat interaksi...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ fontFamily: "'Nunito', 'Segoe UI', sans-serif", WebkitFontSmoothing: "antialiased" }}>
