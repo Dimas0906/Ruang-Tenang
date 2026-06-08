@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 
-// Proxy aman untuk GSAP dengan standarisasi Easing Material Design
+// Proxy aman untuk GSAP (tanpa menggunakan sintaks ?. yang membuat browser lama crash)
 const gsapObj = {
   to: (...args) => window.gsap ? window.gsap.to(...args) : null,
   from: (...args) => window.gsap ? window.gsap.from(...args) : null,
   fromTo: (...args) => window.gsap ? window.gsap.fromTo(...args) : null,
 };
 
-// Fungsi aman untuk LocalStorage
+// Fungsi aman untuk LocalStorage (mencegah crash di Incognito/Private Mode browser HP)
 const safeGetSessions = () => {
   try {
     return JSON.parse(localStorage.getItem("ruang_tenang_sessions") || "[]");
@@ -24,8 +24,6 @@ const safeSaveSessions = (sessions) => {
     console.warn("Gagal menyimpan data. Mungkin browser dalam mode privat.", err);
   }
 };
-
-/* ─────────────────── QUOTE & DATA ─────────────────── */
 
 const RENUNGAN = [
   "Tubuhmu tahu kapan ia butuh istirahat. Dengarkan.",
@@ -154,7 +152,50 @@ const FOOTER_QUOTES = [
   { title: "Kamu tidak harus sempurna.", body: "Kamu hanya perlu hadir, tulus, dan terus belajar. Itu sudah lebih dari cukup." },
 ];
 
-/* ─────────────────── INSIGHT DATA (>50 Items) ─────────────────── */
+const WELL_BEING_MESSAGES = {
+  frustrasi: [
+    "WELLBEINGMU MINGGU INI TERASA CUKUP MENGHAMBAT. JANGAN LUPA UNTUK MENGAPRESIASI USAHAMU.",
+    "BANYAK HAL YANG MENGHAMBATMU MINGGU INI, YA? MARI KITA BERI RUANG UNTUK BERNAPAS.",
+    "RASANYA MINGGU INI CUKUP MELELAHKAN, TETAP SABAR DENGAN DIRIMU SENDIRI.",
+    "RASA FRUSTRASI SEDANG MENDOMINASI HARIMU. MARI MELAMBAT DAN URAI BENANG KUSUTNYA.",
+    "JANGAN TERLALU KERAS PADA DIRI SENDIRI SAAT SEMUANYA TERASA SULIT MINGGU INI."
+  ],
+  sedih: [
+    "ADA BEBAN EMOSIONAL YANG TERASA BELAKANGAN INI. VALIDKAN PERASAANMU, KAMU TIDAK SENDIRI.",
+    "MINGGU INI TERASA CUKUP BERAT UNTUK HATIMU. MEMBERI WAKTU UNTUK PULIH ITU PENTING.",
+    "BANYAK KESEDIHAN YANG MUNCUL, JANGAN TERLALU KERAS PADA DIRIMU SENDIRI.",
+    "HATI YANG SEDIH BUTUH DIRANGKUL. MARI KITA JAGA DIRIMU LEBIH LEMBUT MINGGU INI.",
+    "TIDAK APA-APA UNTUK MERASA RAPUH. WELLBEINGMU SEDANG BUTUH PERHATIAN EKSTRA."
+  ],
+  cemas: [
+    "BANYAK PIKIRAN YANG BERLALU-LALANG MINGGU INI. MARI KEMBALI KE SAAT INI, NAPAS DEMI NAPAS.",
+    "KECEMASANMU ADALAH SINYAL UNTUK MELAMBAT. KAMU TIDAK PERLU MENGENDALIKAN SEMUANYA SEKALIGUS.",
+    "MINGGU INI MUNGKIN TERASA TIDAK MENENTU, TETAPLAH FOKUS PADA SATU LANGKAH KECIL.",
+    "RASA KHAWATIR SEDANG TINGGI. INGATLAH BAHWA KAMU MAMPU MELEWATI KETIDAKPASTIAN INI.",
+    "WELLBEINGMU SEDANG DIUJI OLEH KECEMASAN. MARI BERLATIH GROUNDING UNTUK KEMBALI TENANG."
+  ],
+  marah: [
+    "ADA GEJOLAK EMOSI YANG CUKUP INTENS MINGGU INI. TENANGKAN DIRIMU, KAMU PUNYA KENDALI.",
+    "ENERGI AMARAHMU SEDANG TINGGI. INGAT, DIRIMU JAUH LEBIH BESAR DARIPADA SITUASINYA.",
+    "MINGGU INI TERASA CUKUP PANAS UNTUK EMOSIMU. AMBIL JEDA UNTUK MENDINGINKAN HATI.",
+    "RASA MARAH ADALAH TANDA ADA BATASAN YANG DILANGGAR. MARI KELOLA DENGAN BIJAK.",
+    "WELLBEINGMU BUTUH RUANG UNTUK MELEPASKAN KETEGANGAN. JANGAN PENDAM SENDIRIAN."
+  ],
+  kecewa: [
+    "MINGGU INI PENUH DENGAN EKSPEKTASI YANG BELUM TERJAWAB. BERBAIK HATILAH PADA DIRIMU SENDIRI.",
+    "PERASAAN KECEWA ITU MANUSIAWI. MARI FOKUS PADA APA YANG BISA DIPERBAIKI, SATU LANGKAH KECIL.",
+    "TIDAK SEMUA HAL BERJALAN SESUAI RENCANA, DAN ITU TIDAK APA-APA. KAMU TETAP BERHARGA.",
+    "RASA KECEWA SEDANG MENYELIMUTI MINGGU INI. TERIMA PERASAAN ITU, LALU PELAN-PELAN LEPASKAN.",
+    "WELLBEINGMU TERDAMPAK OLEH HARAPAN YANG GUGUR. MARI KITA BANGUN KEMBALI PELAN-PELAN."
+  ],
+  cukup_baik: [
+    "WELLBEINGMU CUKUP TERJAGA MINGGU INI. TERUSLAH PRAKTIKKAN KESADARAN DIRI INI!",
+    "MINGGU YANG STABIL! KEHADIRANMU YANG TENANG SANGAT BERHARGA BAGI MURID-MURIDMU.",
+    "KAMU MELALUI MINGGU INI DENGAN SANGAT BAIK. PERTAHANKAN RITME KETENANGANMU.",
+    "KERJA BAGUS! KAMU MAMPU MENJAGA KESEIMBANGAN EMOSIMU DI TENGAH KESIBUKAN.",
+    "ENERGI POSITIFMU MENDOMINASI! TERUSLAH MENJADI SUMBER KEHANGATAN DI KELAS."
+  ]
+};
 
 const ENCOURAGEMENTS = [
   "Setiap perasaan yang kamu alami adalah valid.", "Kamu lebih kuat dari badai yang sedang kamu lewati.", "Hari yang berat bukan berarti kamu guru yang buruk.", "Langkah kecilmu hari ini adalah kemenangan.", "Tidak apa-apa untuk sesekali merasa lelah.",
@@ -264,10 +305,15 @@ const RESPONSE_QUOTES = {
 };
 
 const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const getEmotionEmoji = (val) => EMOTION_OPTIONS.find(e => e.value === val)?.emoji || "💭";
-const getEmotionLabel = (val) => EMOTION_OPTIONS.find(e => e.value === val)?.label || val;
-
-/* ─────────────────── BREATHING GUIDE ─────────────────── */
+// Gunakan cara konvensional array find untuk WebView tua (tanpa ?.)
+const getEmotionEmoji = (val) => {
+  const e = EMOTION_OPTIONS.find(item => item.value === val);
+  return e ? e.emoji : "💭";
+};
+const getEmotionLabel = (val) => {
+  const e = EMOTION_OPTIONS.find(item => item.value === val);
+  return e ? e.label : val;
+};
 
 function BreathingGuide({ onDone }) {
   const [phase, setPhase] = useState("idle");
@@ -328,7 +374,7 @@ function BreathingGuide({ onDone }) {
                   fontWeight: 700,
                   fontSize: "16px",
                   cursor: "pointer",
-                  transition: "background 0.2s, color 0.2s" // GSAP handles scale, CSS handles color
+                  transition: "background 0.2s, color 0.2s"
                 }}
               >
                 {n}×
@@ -463,8 +509,6 @@ function BreathingGuide({ onDone }) {
   );
 }
 
-/* ─────────────────── PILL OPTION BUTTON ─────────────────── */
-
 function OptionPill({ selected, onClick, children, selectedColor = "#4a9d7f" }) {
   const pillRef = useRef(null);
 
@@ -504,18 +548,14 @@ function OptionPill({ selected, onClick, children, selectedColor = "#4a9d7f" }) 
   );
 }
 
-/* ─────────────────── STEP CARD ─────────────────── */
-
 function StepCard({ number, title, subtitle, accentColor = "#4a9d7f", bgColor = "#f6fdf9", children, completed }) {
   const [open, setOpen] = useState(true);
   const cardRef = useRef(null);
   const contentRef = useRef(null);
 
-  // Animasi hover card
   const onCardEnter = () => gsapObj.to(cardRef.current, { y: -2, boxShadow: "0 6px 16px rgba(0,0,0,0.06)", duration: 0.2, ease: "power2.out", overwrite: "auto" });
   const onCardLeave = () => gsapObj.to(cardRef.current, { y: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", duration: 0.2, ease: "power2.out", overwrite: "auto" });
 
-  // Animasi expand/collapse content
   useEffect(() => {
     if (open && contentRef.current) {
       gsapObj.fromTo(contentRef.current, 
@@ -564,14 +604,11 @@ function StepCard({ number, title, subtitle, accentColor = "#4a9d7f", bgColor = 
   );
 }
 
-/* ─────────────────── SECTION LABEL ─────────────────── */
 function SectionLabel({ children }) {
   return (
     <p style={{ fontSize: 13, fontWeight: 700, color: "#3d5a4a", marginBottom: 10, marginTop: 4 }}>{children}</p>
   );
 }
-
-/* ─────────────────── HISTORY PAGE (SEMUA SESI) ─────────────────── */
 
 function HistoryPage({ onBack }) {
   const [sessions, setSessions] = useState(() => safeGetSessions());
@@ -579,50 +616,42 @@ function HistoryPage({ onBack }) {
   const pageRef = useRef(null);
 
   const [insightData, setInsightData] = useState({
-    encouragement: "", affirmation: "", suggestion: "", wellBeing: ""
+    encouragement: "", affirmation: "", suggestion: "", wellbeingMsg: ""
   });
 
-  const dominantEmotionData = useMemo(() => {
+  // Menganalisis 5 sesi terakhir
+  const dominantEmotion = useMemo(() => {
     if (sessions.length < 5) return null;
     const last5 = sessions.slice(0, 5); 
     const counts = {};
-    let negativeCount = 0;
     
     last5.forEach(s => {
       if (s.emotions && s.emotions.length > 0) {
         s.emotions.forEach(e => {
           counts[e] = (counts[e] || 0) + 1;
-          if (e !== "cukup_baik") negativeCount++;
         });
       }
     });
 
     if (Object.keys(counts).length === 0) return null;
-    const dominantEmotion = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-    
-    let wellBeingMsg = "";
-    if (negativeCount >= 3) {
-      wellBeingMsg = "WELLBEINGMU BELAKANGAN INI SEDANG MENANTANG. YUK LEBIH BANYAK BERIKAN WAKTU UNTUK DIRIMU SENDIRI.";
-    } else {
-      wellBeingMsg = "WELLBEINGMU CUKUP TERJAGA. TERUSLAH PRAKTIKKAN KESADARAN DIRI INI!";
-    }
-
-    return { dominantEmotion, wellBeingMsg };
+    return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
   }, [sessions]);
 
   useEffect(() => {
-    if (dominantEmotionData) {
-      const suggestions = SUGGESTIONS_BY_EMOTION[dominantEmotionData.dominantEmotion] || SUGGESTIONS_BY_EMOTION["sedih"];
+    if (dominantEmotion) {
+      const suggestions = SUGGESTIONS_BY_EMOTION[dominantEmotion] || SUGGESTIONS_BY_EMOTION["sedih"];
+      const wbMsgs = WELL_BEING_MESSAGES[dominantEmotion] || WELL_BEING_MESSAGES["sedih"];
+      
       setInsightData({
         encouragement: rand(ENCOURAGEMENTS),
         affirmation: rand(AFFIRMATIONS),
         suggestion: rand(suggestions),
-        wellBeing: dominantEmotionData.wellBeingMsg
+        wellbeingMsg: rand(wbMsgs)
       });
     }
-  }, [dominantEmotionData]);
+  }, [dominantEmotion]);
 
-  // Entrance Animasi Halus saat halaman riwayat dibuka
+  // Entrance Animasi Halus
   useEffect(() => {
     if (pageRef.current) {
       gsapObj.fromTo(pageRef.current.children,
@@ -647,7 +676,6 @@ function HistoryPage({ onBack }) {
            date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
   };
 
-  // Fungsi untuk trigger animasi expand pada item history
   const renderExpandedContent = (el) => {
     if (el && !el.dataset.animated) {
       el.dataset.animated = "true";
@@ -671,12 +699,12 @@ function HistoryPage({ onBack }) {
 
       <div ref={pageRef} style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
         
-        {/* === INSIGHT CARD === */}
-        {dominantEmotionData && (
+        {/* === INSIGHT CARD WARM TONES === */}
+        {dominantEmotion && (
           <div style={{ 
             background: "linear-gradient(135deg, #fffbf5, #fdf5ea)", 
             borderRadius: 20, 
-            border: "1.5px solid #ebd8c8", 
+            border: "1.5px solid #f0e0d0", 
             padding: 24, 
             boxShadow: "0 4px 14px rgba(138, 90, 48, 0.06)",
             marginBottom: 8
@@ -688,19 +716,17 @@ function HistoryPage({ onBack }) {
             
             <p style={{ color: "#5a3a20", fontSize: 14, lineHeight: 1.6, margin: "0 0 16px" }}>
               Dari catatanmu belakangan ini, sepertinya kamu cukup sering merasa 
-              <strong style={{ color: "#a66033", background: "#fdf0e8", border: "1px solid #f0d0b8", padding: "2px 8px", borderRadius: 8, marginLeft: 6, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                {getEmotionEmoji(dominantEmotionData.dominantEmotion)} {getEmotionLabel(dominantEmotionData.dominantEmotion)}
+              <strong style={{ color: "#8a5a30", background: "#f8ecd8", padding: "2px 8px", borderRadius: 8, marginLeft: 6, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {getEmotionEmoji(dominantEmotion)} {getEmotionLabel(dominantEmotion)}
               </strong>.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {/* Penyemangat (Well Being digabungkan di sini) */}
-              <div style={{ background: "#fff", padding: 14, borderRadius: 12, border: "1px solid #f0e0d0", borderLeft: "4px solid #d4845a" }}>
-                <p style={{ margin: "0 0 8px", color: "#a66033", fontSize: 11, fontWeight: 800, textAlign: "center", letterSpacing: 0.5 }}>
-                  {insightData.wellBeing}
-                </p>
-                <p style={{ margin: 0, color: "#7a4a2a", fontSize: 13, fontStyle: "italic", lineHeight: 1.5, textAlign: "center" }}>
-                  "{insightData.encouragement}"
+              
+              {/* Well-Being Analysis */}
+              <div style={{ background: "#d4845a", padding: "12px 14px", borderRadius: 12, border: "1px solid #c4744a", textAlign: "center" }}>
+                <p style={{ margin: 0, color: "#ffffff", fontSize: 12, fontWeight: 800, letterSpacing: 0.5, lineHeight: 1.5 }}>
+                  {insightData.wellbeingMsg}
                 </p>
               </div>
 
@@ -710,10 +736,15 @@ function HistoryPage({ onBack }) {
                 <p style={{ margin: 0, color: "#1e3a2a", fontSize: 13, fontWeight: 700 }}>"{insightData.affirmation}"</p>
               </div>
 
-              {/* Saran Tindakan */}
-              <div style={{ background: "#fdf0e8", padding: 14, borderRadius: 12, border: "1px solid #f0d0b8" }}>
-                <p style={{ margin: "0 0 4px", color: "#8a5a30", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>🌱 Saran Tindakan</p>
-                <p style={{ margin: 0, color: "#5a3a20", fontSize: 13, lineHeight: 1.5 }}>{insightData.suggestion}</p>
+              {/* Penyemangat & Saran */}
+              <div style={{ background: "#fff", padding: 14, borderRadius: 12, border: "1px solid #f0e0d0" }}>
+                <p style={{ margin: "0 0 4px", color: "#8a5a30", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>🌱 Pesan & Saran Tindakan</p>
+                <p style={{ margin: "0 0 8px", color: "#a66033", fontSize: 13, fontStyle: "italic", lineHeight: 1.5 }}>
+                  "{insightData.encouragement}"
+                </p>
+                <p style={{ margin: 0, color: "#5a3a20", fontSize: 13, lineHeight: 1.5, borderTop: "1px solid #f0e0d0", paddingTop: 8 }}>
+                  Mungkin bisa dicoba: {insightData.suggestion}
+                </p>
               </div>
             </div>
           </div>
@@ -862,14 +893,11 @@ function HistoryPage({ onBack }) {
   );
 }
 
-/* ─────────────────── LANDING PAGE ─────────────────── */
-
 function LandingPage({ onStart, onHistory }) {
   const [quote] = useState(() => rand(QUOTES));
   const [renungan] = useState(() => rand(RENUNGAN));
   const pageRef = useRef(null);
 
-  // Animasi standard Google: durasi moderat, kurva deceleration
   useEffect(() => {
     if (pageRef.current) {
       gsapObj.fromTo(pageRef.current.children,
@@ -966,8 +994,6 @@ function LandingPage({ onStart, onHistory }) {
     </div>
   );
 }
-
-/* ─────────────────── MINDFULNESS PAGE ─────────────────── */
 
 function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
   const pageRef = useRef(null);
@@ -1377,8 +1403,6 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
     </div>
   );
 }
-
-/* ─────────────────── APP ENTRY ─────────────────── */
 
 export default function App() {
   const [page, setPage] = useState("landing"); // Pages: "landing", "mindfulness", "history"
