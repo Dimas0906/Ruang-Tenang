@@ -1,13 +1,31 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
-// Proxy untuk GSAP yang dimuat via CDN
-const gsap = {
-  to: (...args) => window.gsap?.to(...args),
-  from: (...args) => window.gsap?.from(...args),
-  fromTo: (...args) => window.gsap?.fromTo(...args),
+// Proxy aman untuk GSAP dengan standarisasi Easing Material Design
+const gsapObj = {
+  to: (...args) => window.gsap ? window.gsap.to(...args) : null,
+  from: (...args) => window.gsap ? window.gsap.from(...args) : null,
+  fromTo: (...args) => window.gsap ? window.gsap.fromTo(...args) : null,
 };
 
-/* ─────────────────── QUOTE DATA ─────────────────── */
+// Fungsi aman untuk LocalStorage
+const safeGetSessions = () => {
+  try {
+    return JSON.parse(localStorage.getItem("ruang_tenang_sessions") || "[]");
+  } catch (err) {
+    console.warn("Storage tidak dapat diakses", err);
+    return [];
+  }
+};
+
+const safeSaveSessions = (sessions) => {
+  try {
+    localStorage.setItem("ruang_tenang_sessions", JSON.stringify(sessions));
+  } catch (err) {
+    console.warn("Gagal menyimpan data. Mungkin browser dalam mode privat.", err);
+  }
+};
+
+/* ─────────────────── QUOTE & DATA ─────────────────── */
 
 const RENUNGAN = [
   "Tubuhmu tahu kapan ia butuh istirahat. Dengarkan.",
@@ -136,25 +154,62 @@ const FOOTER_QUOTES = [
   { title: "Kamu tidak harus sempurna.", body: "Kamu hanya perlu hadir, tulus, dan terus belajar. Itu sudah lebih dari cukup." },
 ];
 
-const RESPONSE_QUOTES = {
-  spontan: [
-    "Reaksi spontan adalah tanda bahwa kamu peduli. Sekarang kamu punya kesempatan untuk memilih lagi.",
-    "Tidak apa-apa bereaksi spontan — yang penting kamu menyadarinya sekarang. Itu langkah luar biasa.",
-    "Tubuhmu bereaksi lebih cepat dari pikiranmu. Kini pikiranmu sudah ikut — dan kamu bisa memilih lebih baik.",
-  ],
-  cukup_tenang: [
-    "Luar biasa! Menjaga ketenangan di momen sulit adalah keahlian yang tidak mudah. Kamu melakukannya dengan baik.",
-    "Kamu berhasil menjaga dirimu tetap tenang — itu bukan hal kecil. Itu adalah kekuatan sejati.",
-    "Tetap tenang di tengah badai adalah seni. Dan kamu sudah mempraktikkannya hari ini.",
-  ],
-  ingin_diperbaiki: [
-    "Kesadaran untuk ingin lebih baik adalah awal dari semua perubahan. Kamu sudah setengah jalan.",
-    "Keinginanmu untuk diperbaiki adalah tanda guru yang luar biasa. Teruslah bertumbuh.",
-    "Guru yang ingin terus berkembang adalah guru yang paling berdampak. Kamu ada di jalur yang tepat.",
-  ],
-};
+/* ─────────────────── INSIGHT DATA (>50 Items) ─────────────────── */
 
-/* ─────────────────── CONSTANTS ─────────────────── */
+const ENCOURAGEMENTS = [
+  "Setiap perasaan yang kamu alami adalah valid.", "Kamu lebih kuat dari badai yang sedang kamu lewati.", "Hari yang berat bukan berarti kamu guru yang buruk.", "Langkah kecilmu hari ini adalah kemenangan.", "Tidak apa-apa untuk sesekali merasa lelah.",
+  "Kamu sedang bertumbuh melalui tantangan ini.", "Murid-muridmu beruntung memilikimu yang peduli.", "Air mata adalah cara hati membersihkan diri.", "Keberanianmu untuk hadir hari ini sangat luar biasa.", "Jangan lupa, kamu juga manusia biasa.",
+  "Peluk dirimu sendiri, kamu sudah bekerja keras.", "Kesabaranmu akan membuahkan hasil yang manis.", "Momen ini akan berlalu, dan kamu akan baik-baik saja.", "Cahayamu tetap terang meski sedang meredup.", "Izinkan dirimu bernapas sejenak.",
+  "Kamu tidak harus sempurna setiap saat.", "Kegagalan kecil hari ini adalah pelajaran untuk esok.", "Kamu sedang menanam benih kebaikan yang tak terlihat.", "Waktu istirahat bukan berarti kamu menyerah.", "Berbaik hatilah pada dirimu sendiri hari ini.",
+  "Setiap detak jantungmu membawa harapan baru.", "Kamu layak mendapatkan ketenangan.", "Beban ini tidak harus kamu pikul sendirian.", "Matahari akan bersinar lagi esok hari.", "Hargai dirimu karena sudah mencoba yang terbaik.",
+  "Kelembutanmu pada diri sendiri adalah kekuatan sejati.", "Tidak ada badai yang bertahan selamanya.", "Perjalananmu unik dan indah apa adanya.", "Kamu berhak merasa sedih, marah, atau kecewa.", "Satu napas dalam bisa merubah arah harimu.",
+  "Pikiran yang kalut butuh waktu untuk mereda.", "Kamu adalah arsitek kebahagiaanmu sendiri.", "Terima kasih sudah tidak menyerah hari ini.", "Anak-anak melihat ketulusanmu, percayalah.", "Ruang kelasmu adalah tempat penuh keajaiban berkatmu.",
+  "Jangan biarkan satu momen mendefinisikan seluruh harimu.", "Kamu sedang belajar menjadi versi terbaikmu.", "Kesalahan adalah batu loncatan menuju kebijaksanaan.", "Tenanglah, kamu sudah melakukan hal yang luar biasa.", "Momen kelam ini hanya sebagian kecil dari ceritamu.",
+  "Setiap kali kamu memilih bangkit, kamu menjadi lebih kuat.", "Biarkan dirimu merasakan, lalu lepaskan perlahan.", "Kamu adalah pelindung bagi mimpi-mimpi kecil mereka.", "Jeda adalah bagian penting dari produktivitas.", "Kamu memiliki ruang untuk membuat kesalahan.",
+  "Kasih sayangmu meninggalkan jejak abadi.", "Kamu jauh melebihi keraguanmu sendiri.", "Bernapaslah, kamu sudah melangkah sejauh ini.", "Pekerjaanmu mengubah masa depan, itu hal besar.", "Kemampuanmu merefleksikan diri adalah bukti kepedulianmu.",
+  "Kamu selalu bisa memulai kembali setiap pagi.", "Percayalah pada proses penyembuhanmu sendiri.", "Hatimu yang tulus tidak akan pernah salah.", "Hargai keringat dan lelahmu hari ini.", "Kamu berhak bahagia, bahkan di hari kerja yang sibuk."
+];
+
+const AFFIRMATIONS = [
+  "Saya mengizinkan diri saya untuk beristirahat.", "Saya adalah guru yang cukup dan berharga.", "Emosi saya tidak mengendalikan saya.", "Saya melepaskan apa yang tidak bisa saya kontrol.", "Saya pantas mendapatkan kedamaian pikiran.",
+  "Setiap hari saya belajar hal baru.", "Saya memilih untuk merespons dengan tenang.", "Saya memaafkan diri saya atas kesalahan hari ini.", "Tubuh dan pikiran saya pantas untuk dirawat.", "Saya menerima diri saya seutuhnya, saat kuat maupun lemah.",
+  "Saya adalah sumber energi positif di kelas.", "Saya memiliki kemampuan untuk mengatasi kelas yang menantang.", "Saya bersyukur atas kesempatan mendidik hari ini.", "Saya memilih untuk fokus pada kebaikan kecil.", "Kesehatan mental saya adalah prioritas utama.",
+  "Saya memancarkan kelembutan dan kesabaran.", "Saya layak mendapatkan ruang untuk bernapas.", "Pikiran saya jernih dan tenang.", "Saya adalah tempat yang aman bagi murid-murid saya.", "Saya berhak untuk berkata 'tidak' demi keseimbangan diri.",
+  "Saya melepaskan beban yang bukan milik saya.", "Saya bangga dengan progres yang saya capai.", "Saya dikelilingi oleh dukungan dan cinta.", "Saya cukup, lebih dari cukup.", "Saya mengampuni diri saya karena menjadi manusiawi.",
+  "Saya menghargai setiap emosi yang datang dan pergi.", "Saya memiliki kekuatan untuk mengubah hari ini.", "Saya memilih melihat peluang dalam setiap masalah.", "Saya menyayangi diri saya sama seperti saya menyayangi orang lain.", "Saya bebas dari keharusan untuk selalu sempurna.",
+  "Setiap napas yang saya ambil membawa kedamaian.", "Saya bersyukur atas ketangguhan yang saya miliki.", "Saya mengontrol respon saya, bukan sebaliknya.", "Saya memberikan diri saya izin untuk tumbuh secara perlahan.", "Saya adalah pembawa perubahan yang positif.",
+  "Saya merayakan kemenangan kecil saya hari ini.", "Saya pantas dihargai dan dihormati.", "Saya memilih kedamaian daripada kesempurnaan.", "Saya melepaskan rasa bersalah masa lalu.", "Saya terhubung dengan kebijaksanaan batin saya.",
+  "Saya menyadari batasan energi saya dan menghormatinya.", "Saya aman di momen saat ini.", "Saya bernapas membuang stres, menghirup tenang.", "Saya memegang kendali atas kebahagiaan saya.", "Saya mengapresiasi tubuh saya yang menopang saya.",
+  "Saya percaya bahwa esok akan lebih baik.", "Saya layak menerima kasih sayang dari diri sendiri.", "Saya menyambut tantangan dengan pikiran terbuka.", "Saya memilih untuk melepaskan segala ketegangan.", "Saya adalah individu yang berkembang dan belajar setiap harinya.",
+  "Saya mencintai profesi saya tanpa kehilangan diri saya.", "Saya memiliki keberanian untuk meminta bantuan.", "Saya menghormati perasaan saya yang sedang berproses.", "Saya bersedia melepaskan harapan yang tidak realistis.", "Saya damai, saya hadir, saya siap."
+];
+
+const SUGGESTIONS_BY_EMOTION = {
+  sedih: [
+    "Coba tuliskan perasaan sedihmu di jurnal khusus.", "Dengarkan musik favorit yang bisa menenangkan hatimu.", "Bicaralah dengan sahabat atau rekan kerja yang suportif.", "Izinkan dirimu menangis jika itu melegakan.", "Lakukan aktivitas yang memanjakan diri, seperti mandi air hangat.",
+    "Beri dirimu pelukan fisik (butterfly hug) selama 1 menit.", "Ingat kembali 3 hal kecil yang membuatmu tersenyum hari ini."
+  ],
+  marah: [
+    "Lakukan teknik pernapasan 4-7-8 untuk menetralkan detak jantung.", "Coba berjalan kaki sebentar keluar ruangan untuk mencari udara segar.", "Luapkan emosimu dengan mencoret-coret kertas lalu membuangnya.", "Minum segelas air dingin dengan perlahan.", "Hindari merespons atau mengambil keputusan saat emosi memuncak.",
+    "Beri jeda 5 menit di ruangan yang sepi sebelum kembali ke kelas.", "Kepalkan tanganmu kuat-kuat selama 5 detik, lalu lepaskan perlahan."
+  ],
+  cemas: [
+    "Praktikkan teknik grounding 5-4-3-2-1 untuk kembali ke masa kini.", "Fokuskan pikiranmu pada apa yang bisa kamu kontrol hari ini.", "Tarik napas dalam, lalu rasakan kaki berpijak kuat di lantai.", "Kurangi konsumsi kafein atau kopi untuk sementara waktu.", "Tuliskan hal yang kamu cemaskan, lalu cari 1 solusi kecil.",
+    "Letakkan tangan di dada dan rasakan detak jantungmu melambat.", "Lakukan peregangan tubuh ringan (stretching) selama 3 menit."
+  ],
+  frustrasi: [
+    "Ambil jarak dari tugas atau situasi tersebut selama 10 menit.", "Pecah tugas atau masalah yang besar menjadi langkah-langkah sangat kecil.", "Ubah lingkungan fisikmu sejenak, misalnya berpindah kursi atau ruangan.", "Dengarkan podcast atau tonton video pendek yang menghibur.", "Bicarakan kebingunganmu dengan rekan guru lain untuk perspektif baru.",
+    "Tarik napas dalam dan akui bahwa wajar merasa buntu.", "Lakukan aktivitas repetitif yang menenangkan, seperti merapikan meja."
+  ],
+  kecewa: [
+    "Turunkan standar kesempurnaanmu untuk hari ini.", "Sadari bahwa ekspektasi kadang tidak sesuai dengan realitas anak usia dini.", "Evaluasi kembali apa yang telah berjalan baik, sekecil apapun itu.", "Ingat bahwa satu kegagalan tidak mendefinisikan kemampuan mengajarmu.", "Berhenti membandingkan kelasmu dengan kelas guru lain.",
+    "Lakukan sesuatu yang pasti berhasil kamu lakukan untuk membangun rasa percaya diri.", "Tidur lebih awal malam ini untuk mereset energi."
+  ],
+  cukup_baik: [
+    "Pertahankan rutinitas baik yang sedang kamu jalankan hari ini.", "Bagikan energi positifmu dengan memberikan pujian tulus pada murid atau rekan kerja.", "Catat apa yang membuat harimu baik agar bisa diulang di lain waktu.", "Luangkan waktu ekstra untuk bermain dan tertawa bersama anak-anak.", "Manfaatkan energi ini untuk merencanakan aktivitas seru esok hari.",
+    "Beri apresiasi pada dirimu sendiri: 'Saya melakukan pekerjaan hebat hari ini!'", "Teruslah hadir sepenuhnya dan nikmati momen-momen kecil di kelas."
+  ]
+};
 
 const EMOTION_OPTIONS = [
   { emoji: "😤", label: "Frustrasi", value: "frustrasi" },
@@ -190,8 +245,27 @@ const SELF_CARE = [
   { icon: "🎵", label: "Dengarkan Musik", value: "musik" },
 ];
 
+const RESPONSE_QUOTES = {
+  spontan: [
+    "Reaksi spontan adalah tanda bahwa kamu peduli. Sekarang kamu punya kesempatan untuk memilih lagi.",
+    "Tidak apa-apa bereaksi spontan — yang penting kamu menyadarinya sekarang. Itu langkah luar biasa.",
+    "Tubuhmu bereaksi lebih cepat dari pikiranmu. Kini pikiranmu sudah ikut — dan kamu bisa memilih lebih baik.",
+  ],
+  cukup_tenang: [
+    "Luar biasa! Menjaga ketenangan di momen sulit adalah keahlian yang tidak mudah. Kamu melakukannya dengan baik.",
+    "Kamu berhasil menjaga dirimu tetap tenang — itu bukan hal kecil. Itu adalah kekuatan sejati.",
+    "Tetap tenang di tengah badai adalah seni. Dan kamu sudah mempraktikkannya hari ini.",
+  ],
+  ingin_diperbaiki: [
+    "Kesadaran untuk ingin lebih baik adalah awal dari semua perubahan. Kamu sudah setengah jalan.",
+    "Keinginanmu untuk diperbaiki adalah tanda guru yang luar biasa. Teruslah bertumbuh.",
+    "Guru yang ingin terus berkembang adalah guru yang paling berdampak. Kamu ada di jalur yang tepat.",
+  ],
+};
+
 const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const getEmotionEmoji = (val) => EMOTION_OPTIONS.find(e => e.value === val)?.emoji || "💭";
+const getEmotionLabel = (val) => EMOTION_OPTIONS.find(e => e.value === val)?.label || val;
 
 /* ─────────────────── BREATHING GUIDE ─────────────────── */
 
@@ -202,7 +276,6 @@ function BreathingGuide({ onDone }) {
   const [totalCycles, setTotalCycles] = useState(3);
   const [phaseIndex, setPhaseIndex] = useState(0);
   const timerRef = useRef(null);
-  const [bounce, setBounce] = useState(false);
 
   const PHASES = [
     { name: "Tarik Napas", instruction: "Hirup udara perlahan lewat hidung", duration: 4, color: "#4a9d7f", bg: "#e8f5ef" },
@@ -213,7 +286,6 @@ function BreathingGuide({ onDone }) {
   useEffect(() => {
     if (phase !== "running") return;
     const currentPhase = PHASES[phaseIndex];
-    setBounce(phaseIndex === 0);
     if (count < currentPhase.duration) {
       timerRef.current = setTimeout(() => setCount((c) => c + 1), 1000);
     } else {
@@ -245,8 +317,8 @@ function BreathingGuide({ onDone }) {
               <button
                 key={n}
                 onClick={() => setTotalCycles(n)}
-                onMouseEnter={(e) => { if(totalCycles !== n) gsap.to(e.currentTarget, { scale: 1.05, duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
-                onMouseLeave={(e) => { if(totalCycles !== n) gsap.to(e.currentTarget, { scale: 1, duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
+                onMouseEnter={(e) => { if(totalCycles !== n) gsapObj.to(e.currentTarget, { scale: 1.02, duration: 0.15, ease: "power2.out", overwrite: "auto" }) }}
+                onMouseLeave={(e) => { if(totalCycles !== n) gsapObj.to(e.currentTarget, { scale: 1, duration: 0.15, ease: "power2.out", overwrite: "auto" }) }}
                 style={{
                   background: totalCycles === n ? "#4a9d7f" : "#ffffff",
                   color: totalCycles === n ? "#ffffff" : "#4a9d7f",
@@ -256,6 +328,7 @@ function BreathingGuide({ onDone }) {
                   fontWeight: 700,
                   fontSize: "16px",
                   cursor: "pointer",
+                  transition: "background 0.2s, color 0.2s" // GSAP handles scale, CSS handles color
                 }}
               >
                 {n}×
@@ -295,8 +368,8 @@ function BreathingGuide({ onDone }) {
       {phase === "idle" && (
         <button
           onClick={start}
-          onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.03, y: -2, backgroundColor: "#3d8a6e", duration: 0.2, ease: "power2.out", overwrite: "auto" })}
-          onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, y: 0, backgroundColor: "#4a9d7f", duration: 0.2, ease: "power2.out", overwrite: "auto" })}
+          onMouseEnter={(e) => gsapObj.to(e.currentTarget, { scale: 1.02, y: -2, backgroundColor: "#3d8a6e", duration: 0.15, ease: "power2.out", overwrite: "auto" })}
+          onMouseLeave={(e) => gsapObj.to(e.currentTarget, { scale: 1, y: 0, backgroundColor: "#4a9d7f", duration: 0.15, ease: "power2.out", overwrite: "auto" })}
           style={{
             background: "#4a9d7f",
             color: "#ffffff",
@@ -367,8 +440,8 @@ function BreathingGuide({ onDone }) {
           </p>
           <button
             onClick={onDone}
-            onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.05, y: -2, duration: 0.2, ease: "power2.out", overwrite: "auto" })}
-            onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, y: 0, duration: 0.2, ease: "power2.out", overwrite: "auto" })}
+            onMouseEnter={(e) => gsapObj.to(e.currentTarget, { scale: 1.02, y: -2, duration: 0.15, ease: "power2.out", overwrite: "auto" })}
+            onMouseLeave={(e) => gsapObj.to(e.currentTarget, { scale: 1, y: 0, duration: 0.15, ease: "power2.out", overwrite: "auto" })}
             style={{
               background: "#4a9d7f", color: "#ffffff", border: "none",
               borderRadius: "999px", padding: "12px 32px", fontWeight: 700,
@@ -396,20 +469,20 @@ function OptionPill({ selected, onClick, children, selectedColor = "#4a9d7f" }) 
   const pillRef = useRef(null);
 
   useEffect(() => {
-    gsap.to(pillRef.current, {
+    gsapObj.to(pillRef.current, {
       backgroundColor: selected ? selectedColor : "#ffffff",
       color: selected ? "#ffffff" : "#3d5a4a",
       borderColor: selected ? selectedColor : "#b8d4c8",
       boxShadow: selected ? `0 2px 10px ${selectedColor}40` : "none",
-      scale: selected ? 1.04 : 1,
-      duration: 0.3,
+      scale: selected ? 1.02 : 1,
+      duration: 0.2,
       ease: "power2.out",
       overwrite: "auto"
     });
   }, [selected, selectedColor]);
 
-  const handleEnter = () => { if (!selected) gsap.to(pillRef.current, { scale: 1.03, y: -2, boxShadow: "0 4px 8px rgba(0,0,0,0.05)", duration: 0.2, ease: "power2.out", overwrite: "auto" }); };
-  const handleLeave = () => { if (!selected) gsap.to(pillRef.current, { scale: 1, y: 0, boxShadow: "none", duration: 0.2, ease: "power2.out", overwrite: "auto" }); };
+  const handleEnter = () => { if (!selected) gsapObj.to(pillRef.current, { scale: 1.02, y: -1, boxShadow: "0 4px 8px rgba(0,0,0,0.05)", duration: 0.15, ease: "power2.out", overwrite: "auto" }); };
+  const handleLeave = () => { if (!selected) gsapObj.to(pillRef.current, { scale: 1, y: 0, boxShadow: "none", duration: 0.15, ease: "power2.out", overwrite: "auto" }); };
 
   return (
     <button
@@ -436,9 +509,21 @@ function OptionPill({ selected, onClick, children, selectedColor = "#4a9d7f" }) 
 function StepCard({ number, title, subtitle, accentColor = "#4a9d7f", bgColor = "#f6fdf9", children, completed }) {
   const [open, setOpen] = useState(true);
   const cardRef = useRef(null);
+  const contentRef = useRef(null);
 
-  const onCardEnter = () => gsap.to(cardRef.current, { y: -2, boxShadow: "0 6px 16px rgba(0,0,0,0.06)", duration: 0.3, ease: "power2.out", overwrite: "auto" });
-  const onCardLeave = () => gsap.to(cardRef.current, { y: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", duration: 0.3, ease: "power2.out", overwrite: "auto" });
+  // Animasi hover card
+  const onCardEnter = () => gsapObj.to(cardRef.current, { y: -2, boxShadow: "0 6px 16px rgba(0,0,0,0.06)", duration: 0.2, ease: "power2.out", overwrite: "auto" });
+  const onCardLeave = () => gsapObj.to(cardRef.current, { y: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", duration: 0.2, ease: "power2.out", overwrite: "auto" });
+
+  // Animasi expand/collapse content
+  useEffect(() => {
+    if (open && contentRef.current) {
+      gsapObj.fromTo(contentRef.current, 
+        { opacity: 0, y: -10 }, 
+        { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }
+      );
+    }
+  }, [open]);
 
   return (
     <div 
@@ -446,11 +531,11 @@ function StepCard({ number, title, subtitle, accentColor = "#4a9d7f", bgColor = 
       onMouseEnter={onCardEnter}
       onMouseLeave={onCardLeave}
       style={{
-      borderRadius: 20, overflow: "hidden",
-      border: completed ? `1.5px solid ${accentColor}` : "1.5px solid #e0ece6",
-      background: completed ? bgColor : "#ffffff",
-      boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
-    }}>
+        borderRadius: 20, overflow: "hidden",
+        border: completed ? `1.5px solid ${accentColor}` : "1.5px solid #e0ece6",
+        background: completed ? bgColor : "#ffffff",
+        boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
+      }}>
       <button
         onClick={() => setOpen((o) => !o)}
         style={{
@@ -472,9 +557,9 @@ function StepCard({ number, title, subtitle, accentColor = "#4a9d7f", bgColor = 
           <p style={{ fontWeight: 700, color: "#1e3a2a", margin: 0, fontSize: 14, letterSpacing: 0.3 }}>{title}</p>
           {subtitle && <p style={{ fontSize: 11, color: "#7a9a8a", margin: "2px 0 0" }}>{subtitle}</p>}
         </div>
-        <span style={{ color: "#9ab5a8", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ color: "#9ab5a8", fontSize: 12, transition: "transform 0.3s", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
       </button>
-      {open && <div style={{ padding: "0 20px 20px" }}>{children}</div>}
+      {open && <div ref={contentRef} style={{ padding: "0 20px 20px" }}>{children}</div>}
     </div>
   );
 }
@@ -486,25 +571,63 @@ function SectionLabel({ children }) {
   );
 }
 
-
 /* ─────────────────── HISTORY PAGE (SEMUA SESI) ─────────────────── */
 
 function HistoryPage({ onBack }) {
-  const [sessions, setSessions] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("ruang_tenang_sessions") || "[]");
-    } catch {
-      return [];
-    }
-  });
+  const [sessions, setSessions] = useState(() => safeGetSessions());
   const [expandedId, setExpandedId] = useState(null);
   const pageRef = useRef(null);
 
+  const [insightData, setInsightData] = useState({
+    encouragement: "", affirmation: "", suggestion: "", wellBeing: ""
+  });
+
+  const dominantEmotionData = useMemo(() => {
+    if (sessions.length < 5) return null;
+    const last5 = sessions.slice(0, 5); 
+    const counts = {};
+    let negativeCount = 0;
+    
+    last5.forEach(s => {
+      if (s.emotions && s.emotions.length > 0) {
+        s.emotions.forEach(e => {
+          counts[e] = (counts[e] || 0) + 1;
+          if (e !== "cukup_baik") negativeCount++;
+        });
+      }
+    });
+
+    if (Object.keys(counts).length === 0) return null;
+    const dominantEmotion = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+    
+    let wellBeingMsg = "";
+    if (negativeCount >= 3) {
+      wellBeingMsg = "WELLBEINGMU BELAKANGAN INI SEDANG MENANTANG. YUK LEBIH BANYAK BERIKAN WAKTU UNTUK DIRIMU SENDIRI.";
+    } else {
+      wellBeingMsg = "WELLBEINGMU CUKUP TERJAGA. TERUSLAH PRAKTIKKAN KESADARAN DIRI INI!";
+    }
+
+    return { dominantEmotion, wellBeingMsg };
+  }, [sessions]);
+
+  useEffect(() => {
+    if (dominantEmotionData) {
+      const suggestions = SUGGESTIONS_BY_EMOTION[dominantEmotionData.dominantEmotion] || SUGGESTIONS_BY_EMOTION["sedih"];
+      setInsightData({
+        encouragement: rand(ENCOURAGEMENTS),
+        affirmation: rand(AFFIRMATIONS),
+        suggestion: rand(suggestions),
+        wellBeing: dominantEmotionData.wellBeingMsg
+      });
+    }
+  }, [dominantEmotionData]);
+
+  // Entrance Animasi Halus saat halaman riwayat dibuka
   useEffect(() => {
     if (pageRef.current) {
-      gsap.fromTo(pageRef.current.children,
-        { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.5, stagger: 0.08, ease: "power2.out" }
+      gsapObj.fromTo(pageRef.current.children,
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.4, stagger: 0.05, ease: "power2.out" }
       );
     }
   }, []);
@@ -514,7 +637,7 @@ function HistoryPage({ onBack }) {
     if(window.confirm("Apakah kamu yakin ingin menghapus catatan sesi ini?")) {
       const updated = sessions.filter(s => s.id !== id);
       setSessions(updated);
-      localStorage.setItem("ruang_tenang_sessions", JSON.stringify(updated));
+      safeSaveSessions(updated);
     }
   };
 
@@ -522,6 +645,14 @@ function HistoryPage({ onBack }) {
     const date = new Date(isoString);
     return date.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " · " +
            date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  // Fungsi untuk trigger animasi expand pada item history
+  const renderExpandedContent = (el) => {
+    if (el && !el.dataset.animated) {
+      el.dataset.animated = "true";
+      gsapObj.fromTo(el, { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" });
+    }
   };
 
   return (
@@ -539,7 +670,56 @@ function HistoryPage({ onBack }) {
       </div>
 
       <div ref={pageRef} style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ marginBottom: 8 }}>
+        
+        {/* === INSIGHT CARD === */}
+        {dominantEmotionData && (
+          <div style={{ 
+            background: "linear-gradient(135deg, #fffbf5, #fdf5ea)", 
+            borderRadius: 20, 
+            border: "1.5px solid #ebd8c8", 
+            padding: 24, 
+            boxShadow: "0 4px 14px rgba(138, 90, 48, 0.06)",
+            marginBottom: 8
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 22 }}>✨</span>
+              <h3 style={{ margin: 0, color: "#8a5a30", fontSize: 16, fontWeight: 800 }}>Insight 5 Sesi Terakhirmu</h3>
+            </div>
+            
+            <p style={{ color: "#5a3a20", fontSize: 14, lineHeight: 1.6, margin: "0 0 16px" }}>
+              Dari catatanmu belakangan ini, sepertinya kamu cukup sering merasa 
+              <strong style={{ color: "#a66033", background: "#fdf0e8", border: "1px solid #f0d0b8", padding: "2px 8px", borderRadius: 8, marginLeft: 6, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {getEmotionEmoji(dominantEmotionData.dominantEmotion)} {getEmotionLabel(dominantEmotionData.dominantEmotion)}
+              </strong>.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Penyemangat (Well Being digabungkan di sini) */}
+              <div style={{ background: "#fff", padding: 14, borderRadius: 12, border: "1px solid #f0e0d0", borderLeft: "4px solid #d4845a" }}>
+                <p style={{ margin: "0 0 8px", color: "#a66033", fontSize: 11, fontWeight: 800, textAlign: "center", letterSpacing: 0.5 }}>
+                  {insightData.wellBeing}
+                </p>
+                <p style={{ margin: 0, color: "#7a4a2a", fontSize: 13, fontStyle: "italic", lineHeight: 1.5, textAlign: "center" }}>
+                  "{insightData.encouragement}"
+                </p>
+              </div>
+
+              {/* Afirmasi */}
+              <div style={{ background: "#e8f5ef", padding: 14, borderRadius: 12, border: "1px solid #c8ddd4" }}>
+                <p style={{ margin: "0 0 4px", color: "#2d5a45", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>💡 Afirmasi Untukmu</p>
+                <p style={{ margin: 0, color: "#1e3a2a", fontSize: 13, fontWeight: 700 }}>"{insightData.affirmation}"</p>
+              </div>
+
+              {/* Saran Tindakan */}
+              <div style={{ background: "#fdf0e8", padding: 14, borderRadius: 12, border: "1px solid #f0d0b8" }}>
+                <p style={{ margin: "0 0 4px", color: "#8a5a30", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>🌱 Saran Tindakan</p>
+                <p style={{ margin: 0, color: "#5a3a20", fontSize: 13, lineHeight: 1.5 }}>{insightData.suggestion}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginBottom: 4 }}>
           <h2 style={{ fontSize: 22, fontWeight: 900, color: "#1e3a2a", margin: "0 0 4px" }}>Riwayat Ketenanganmu</h2>
           <p style={{ color: "#6a8a78", fontSize: 14, margin: 0 }}>Melihat kembali perjalanan mindfulness-mu.</p>
         </div>
@@ -553,6 +733,7 @@ function HistoryPage({ onBack }) {
         ) : (
           sessions.map((session) => {
             const isExpanded = expandedId === session.id;
+            const firstEmotion = session.emotions && session.emotions[0];
             return (
               <div key={session.id} style={{
                 background: "#fff", borderRadius: 16, border: "1.5px solid #e0ece6",
@@ -571,7 +752,7 @@ function HistoryPage({ onBack }) {
                       width: 44, height: 44, borderRadius: "50%", background: "#e8f5ef", color: "#4a9d7f",
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0
                     }}>
-                      {getEmotionEmoji(session.emotions?.[0])}
+                      {getEmotionEmoji(firstEmotion)}
                     </div>
                     <div>
                       <p style={{ fontWeight: 700, color: "#1e3a2a", fontSize: 14, margin: "0 0 2px" }}>
@@ -582,11 +763,11 @@ function HistoryPage({ onBack }) {
                       </p>
                     </div>
                   </div>
-                  <span style={{ color: "#9ab5a8", fontSize: 12 }}>{isExpanded ? "▲" : "▼"}</span>
+                  <span style={{ color: "#9ab5a8", fontSize: 12, transition: "transform 0.3s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
                 </button>
 
                 {isExpanded && (
-                  <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div ref={renderExpandedContent} style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <p style={{ fontSize: 11, fontWeight: 800, color: "#7a9a8a", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>Kejadian</p>
                       <p style={{ fontSize: 14, color: "#2d4a3a", lineHeight: 1.6, background: "#f8fdf9", padding: 12, borderRadius: 10, border: "1px solid #e8f5ef", margin: 0 }}>
@@ -598,7 +779,7 @@ function HistoryPage({ onBack }) {
                       <div>
                         <p style={{ fontSize: 11, fontWeight: 800, color: "#7a9a8a", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>Emosi</p>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                          {session.emotions?.length > 0 ? session.emotions.map(e => (
+                          {session.emotions && session.emotions.length > 0 ? session.emotions.map(e => (
                             <span key={e} style={{ background: "#f0eef8", color: "#5a4a8a", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 12, border: "1px solid #d0c8f0" }}>
                               {e.replace(/_/g, " ")}
                             </span>
@@ -608,7 +789,7 @@ function HistoryPage({ onBack }) {
                       <div>
                         <p style={{ fontSize: 11, fontWeight: 800, color: "#7a9a8a", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>Tubuh</p>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                          {session.bodyParts?.length > 0 ? session.bodyParts.map(b => (
+                          {session.bodyParts && session.bodyParts.length > 0 ? session.bodyParts.map(b => (
                             <span key={b} style={{ background: "#fdf0e8", color: "#8a5a30", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 12, border: "1px solid #f0d0b8" }}>
                               {b}
                             </span>
@@ -620,7 +801,7 @@ function HistoryPage({ onBack }) {
                     <div>
                       <p style={{ fontSize: 11, fontWeight: 800, color: "#7a9a8a", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>Respon Diri</p>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {session.responseType?.map(r => (
+                        {session.responseType && session.responseType.map(r => (
                           <span key={r} style={{ background: "#e8f0fa", color: "#2d4a6a", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 12, border: "1px solid #b8d0e8" }}>
                             {r.replace(/_/g, " ")}
                           </span>
@@ -633,10 +814,10 @@ function HistoryPage({ onBack }) {
                       )}
                     </div>
 
-                    {(session.selfCare?.length > 0 || session.compassionReason) && (
+                    {((session.selfCare && session.selfCare.length > 0) || session.compassionReason) ? (
                       <div>
                         <p style={{ fontSize: 11, fontWeight: 800, color: "#7a9a8a", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>Self-Care & Kasih Sayang</p>
-                        {session.selfCare?.length > 0 && (
+                        {session.selfCare && session.selfCare.length > 0 && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                             {session.selfCare.map(s => (
                               <span key={s} style={{ background: "#fde8f0", color: "#8a3060", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 12, border: "1px solid #f0b8d0" }}>
@@ -651,7 +832,7 @@ function HistoryPage({ onBack }) {
                           </p>
                         )}
                       </div>
-                    )}
+                    ) : null}
 
                     {session.additionalNotes && (
                       <div>
@@ -688,11 +869,12 @@ function LandingPage({ onStart, onHistory }) {
   const [renungan] = useState(() => rand(RENUNGAN));
   const pageRef = useRef(null);
 
+  // Animasi standard Google: durasi moderat, kurva deceleration
   useEffect(() => {
     if (pageRef.current) {
-      gsap.fromTo(pageRef.current.children,
-        { y: 40, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: "power3.out" }
+      gsapObj.fromTo(pageRef.current.children,
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.5, stagger: 0.1, ease: "power2.out" }
       );
     }
   }, []);
@@ -703,8 +885,8 @@ function LandingPage({ onStart, onHistory }) {
       <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10 }}>
         <button 
           onClick={onHistory}
-          onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.05, y: -2, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", duration: 0.2, ease: "power2.out", overwrite: "auto" }) }
-          onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, y: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.04)", duration: 0.2, ease: "power2.out", overwrite: "auto" }) }
+          onMouseEnter={(e) => gsapObj.to(e.currentTarget, { scale: 1.02, y: -2, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", duration: 0.15, ease: "power2.out", overwrite: "auto" }) }
+          onMouseLeave={(e) => gsapObj.to(e.currentTarget, { scale: 1, y: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.04)", duration: 0.15, ease: "power2.out", overwrite: "auto" }) }
           style={{ background: "#fff", border: "1.5px solid #d8ebe3", color: "#4a9d7f", padding: "8px 16px", borderRadius: 999, fontSize: 13, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
         >
           <span>🗓️</span> Semua Sesi
@@ -734,9 +916,8 @@ function LandingPage({ onStart, onHistory }) {
         <div style={{ width: "100%", background: "#fff", borderRadius: 22, padding: "24px 20px", border: "1px solid #e0ece6", boxShadow: "0 2px 12px rgba(0,0,0,0.06)", position: "relative" }}>
           <div style={{ position: "absolute", top: -12, left: 18, background: "#4a9d7f", color: "#fff", fontSize: 10, fontWeight: 800, padding: "4px 14px", borderRadius: 999, letterSpacing: 0.8 }}>AFIRMASI HARI INI</div>
           <div style={{ display: "flex", gap: 10, marginTop: 8, alignItems: "flex-start" }}>
-            <span style={{ color: "#4a9d7f", fontSize: 32, fontFamily: "Georgia, serif", lineHeight: 1, flexShrink: 0 }}>"</span>
             <p style={{ color: "#1e3a2a", fontSize: 14, fontStyle: "italic", lineHeight: 1.7, margin: 0, flex: 1 }}>
-              {quote}<span style={{ color: "#4a9d7f", fontSize: 22, fontFamily: "Georgia, serif", fontStyle: "normal", verticalAlign: "bottom" }}>"</span>
+              <span style={{ color: "#4a9d7f", fontSize: 22, fontFamily: "Georgia, serif", fontStyle: "normal", verticalAlign: "bottom" }}>"</span>{quote}<span style={{ color: "#4a9d7f", fontSize: 22, fontFamily: "Georgia, serif", fontStyle: "normal", verticalAlign: "bottom" }}>"</span>
             </p>
           </div>
         </div>
@@ -744,8 +925,8 @@ function LandingPage({ onStart, onHistory }) {
         {/* CTA */}
         <button
           onClick={onStart}
-          onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.03, y: -3, backgroundColor: "#3d8a6e", duration: 0.2, ease: "power2.out", overwrite: "auto" })}
-          onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, y: 0, backgroundColor: "#4a9d7f", duration: 0.2, ease: "power2.out", overwrite: "auto" })}
+          onMouseEnter={(e) => gsapObj.to(e.currentTarget, { scale: 1.02, y: -2, backgroundColor: "#3d8a6e", duration: 0.15, ease: "power2.out", overwrite: "auto" })}
+          onMouseLeave={(e) => gsapObj.to(e.currentTarget, { scale: 1, y: 0, backgroundColor: "#4a9d7f", duration: 0.15, ease: "power2.out", overwrite: "auto" })}
           style={{
             width: "100%", background: "#4a9d7f", color: "#ffffff", border: "none",
             borderRadius: 16, padding: "16px 24px", fontWeight: 800, fontSize: 16,
@@ -821,9 +1002,9 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
 
   useEffect(() => {
     if (pageRef.current) {
-      gsap.fromTo(pageRef.current.children,
-        { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: "power2.out" }
+      gsapObj.fromTo(pageRef.current.children,
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.4, stagger: 0.08, ease: "power2.out" }
       );
     }
   }, []);
@@ -833,20 +1014,14 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
     data.responseType.length > 0 && data.selfCare.length > 0;
 
   const saveSession = () => {
-    // Format session data with timestamp
     const newSession = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
       ...data
     };
     
-    // Retrieve existing sessions from localStorage
-    const existing = JSON.parse(localStorage.getItem("ruang_tenang_sessions") || "[]");
-    
-    // Save new session at the top of the array
-    localStorage.setItem("ruang_tenang_sessions", JSON.stringify([newSession, ...existing]));
-    
-    // Trigger callback to navigate to history page
+    const existing = safeGetSessions();
+    safeSaveSessions([newSession, ...existing]);
     onSaveSuccess();
   };
 
@@ -1035,7 +1210,9 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
                     selected={data.nextResponses.includes(opt.value)}
                     onClick={() => {
                       const cur = data.nextResponses;
-                      update("nextResponses", cur.includes(opt.value) ? cur.filter((v) => v !== opt.value) : [...cur, cur.includes(opt.value) ? null : opt.value].filter(Boolean));
+                      const hasVal = cur.includes(opt.value);
+                      const newVal = hasVal ? cur.filter((v) => v !== opt.value) : [...cur, opt.value];
+                      update("nextResponses", newVal);
                     }}
                     selectedColor="#5a8fc0"
                   >
@@ -1094,8 +1271,8 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
                         const cur = data.selfCare;
                         update("selfCare", cur.includes(opt.value) ? cur.filter((v) => v !== opt.value) : [...cur, opt.value]);
                       }}
-                      onMouseEnter={(e) => { if(!sel) gsap.to(e.currentTarget, { scale: 1.05, y: -2, duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
-                      onMouseLeave={(e) => { if(!sel) gsap.to(e.currentTarget, { scale: 1, y: 0, duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
+                      onMouseEnter={(e) => { if(!sel) gsapObj.to(e.currentTarget, { scale: 1.02, y: -2, duration: 0.15, ease: "power2.out", overwrite: "auto" }) }}
+                      onMouseLeave={(e) => { if(!sel) gsapObj.to(e.currentTarget, { scale: 1, y: 0, duration: 0.15, ease: "power2.out", overwrite: "auto" }) }}
                       style={{
                         background: sel ? "#fff0f4" : "#fff",
                         border: `2px solid ${sel ? "#c0608a" : "#d8c0cc"}`,
@@ -1103,7 +1280,7 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
                         display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
                         cursor: "pointer",
                         boxShadow: sel ? "0 2px 10px rgba(192,96,138,0.25)" : "none",
-                        transform: sel ? "scale(1.03)" : "scale(1)",
+                        transform: sel ? "scale(1.02)" : "scale(1)",
                         transition: "border 0.2s, background 0.2s, box-shadow 0.2s"
                       }}
                     >
@@ -1171,8 +1348,8 @@ function MindfulnessPage({ onBack, onSaveSuccess, onHistory }) {
             <button
               onClick={saveSession}
               disabled={!allStepsComplete}
-              onMouseEnter={(e) => { if(allStepsComplete) gsap.to(e.currentTarget, { scale: 1.03, y: -2, backgroundColor: "#3d8a6e", duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
-              onMouseLeave={(e) => { if(allStepsComplete) gsap.to(e.currentTarget, { scale: 1, y: 0, backgroundColor: "#4a9d7f", duration: 0.2, ease: "power2.out", overwrite: "auto" }) }}
+              onMouseEnter={(e) => { if(allStepsComplete) gsapObj.to(e.currentTarget, { scale: 1.02, y: -2, backgroundColor: "#3d8a6e", duration: 0.15, ease: "power2.out", overwrite: "auto" }) }}
+              onMouseLeave={(e) => { if(allStepsComplete) gsapObj.to(e.currentTarget, { scale: 1, y: 0, backgroundColor: "#4a9d7f", duration: 0.15, ease: "power2.out", overwrite: "auto" }) }}
               style={{
                 width: "100%",
                 background: allStepsComplete ? "#4a9d7f" : "#e0ece6",
@@ -1235,13 +1412,17 @@ export default function App() {
       document.head.appendChild(style);
     }
 
-    // Load GSAP via CDN
+    // Load GSAP via CDN dengan penanganan error
     if (window.gsap) {
       setGsapReady(true);
     } else {
       const script = document.createElement("script");
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js";
       script.onload = () => setGsapReady(true);
+      script.onerror = () => {
+        console.warn("Gagal memuat animasi GSAP. Aplikasi akan dilanjutkan tanpa animasi.");
+        setGsapReady(true); // Tetap izinkan aplikasi terbuka!
+      };
       document.head.appendChild(script);
     }
   }, []);
@@ -1249,7 +1430,7 @@ export default function App() {
   if (!gsapReady) {
     return (
       <div style={{ minHeight: "100vh", background: "#fcf9f2", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ fontFamily: "'Nunito', sans-serif", color: "#4a9d7f", fontWeight: 700 }}>Memuat interaksi...</p>
+        <p style={{ fontFamily: "'Nunito', sans-serif", color: "#4a9d7f", fontWeight: 700 }}>Memuat antarmuka...</p>
       </div>
     );
   }
